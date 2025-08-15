@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Chess AR</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 300px;
+        }
+
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1001;
+            padding: 20px 40px;
+            font-size: 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #startButton:hover {
+            background: #45a049;
+        }
+
+        #startButton:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        #gameUI {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        #status {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #1976D2;
+        }
+
+        #reticle {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>WebXR Chess AR</h3>
+        <p>Tippen Sie auf "AR starten" um das Spiel zu beginnen. Suchen Sie eine ebene Fläche und tippen darauf, um das Schachbrett zu platzieren.</p>
+    </div>
+
+    <button id="startButton">AR starten</button>
+
+    <div id="gameUI">
+        <div id="status">Wählen Sie eine Fläche für das Schachbrett</div>
+        <button id="resetButton" class="button">Neues Spiel</button>
+        <button id="undoButton" class="button">Zug zurück</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/chess-engine.js"></script>
+    <script src="js/chess-board.js"></script>
+    <script src="js/chess-pieces.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
