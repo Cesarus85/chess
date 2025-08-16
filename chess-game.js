@@ -85,9 +85,9 @@ class ChessGame {
             col: col
         });
         
-        const x = (col - 3.5) * 0.3;
-        const z = (row - 3.5) * 0.3;
-        pieceEl.setAttribute('position', `${x} 0.15 ${z}`);
+        const x = (col - 3.5) * 0.2;
+        const z = (row - 3.5) * 0.2;
+        pieceEl.setAttribute('position', `${x} 0.1 ${z}`);
         
         // Create the 3D model for the piece
         this.pieceModels[piece.type].call(this, pieceEl, piece.color);
@@ -365,10 +365,10 @@ class ChessGame {
         
         // Move piece
         if (fromPiece) {
-            const x = (toCol - 3.5) * 0.3;
-            const z = (toRow - 3.5) * 0.3;
+            const x = (toCol - 3.5) * 0.2;
+            const z = (toRow - 3.5) * 0.2;
             
-            fromPiece.setAttribute('animation__move', `property: position; to: ${x} 0.15 ${z}; dur: 500`);
+            fromPiece.setAttribute('animation__move', `property: position; to: ${x} 0.1 ${z}; dur: 500`);
             fromPiece.setAttribute('chess-piece', 'row', toRow);
             fromPiece.setAttribute('chess-piece', 'col', toCol);
         }
