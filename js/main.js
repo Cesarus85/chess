@@ -87,7 +87,13 @@ class WebXRChessApp {
         const resetButton = document.getElementById('resetButton');
         const undoButton = document.getElementById('undoButton');
 
-        startButton.addEventListener('click', () => this.startAR());
+        // Sicherstellen, dass AR nur nach echtem Benutzerklick gestartet wird
+        startButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            console.log('Start button clicked');
+            this.startAR();
+        }, { once: false });
+        
         resetButton.addEventListener('click', () => this.resetGame());
         undoButton.addEventListener('click', () => this.undoMove());
 
@@ -95,22 +101,32 @@ class WebXRChessApp {
     }
 
     async startAR() {
+        console.log('startAR() called');
+        
+        // Button deaktivieren während des Starts
+        const startButton = document.getElementById('startButton');
+        startButton.disabled = true;
+        startButton.textContent = 'AR wird gestartet...';
+
         if (!navigator.xr) {
             alert('WebXR wird nicht unterstützt. Verwenden Sie einen WebXR-kompatiblen Browser.');
+            this.resetStartButton();
             return;
         }
 
         try {
             // Zuerst prüfen ob AR unterstützt wird
+            console.log('Prüfe AR-Unterstützung...');
             const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
             if (!isSupported) {
                 alert('AR wird von diesem Gerät nicht unterstützt');
+                this.resetStartButton();
                 return;
             }
 
-            console.log('Starte AR-Session...');
+            console.log('AR unterstützt, starte Session...');
             
-            // Session mit reduzierten Anforderungen starten
+            // Session mit minimalen Anforderungen starten
             const session = await navigator.xr.requestSession('immersive-ar', {
                 requiredFeatures: [],
                 optionalFeatures: ['hit-test', 'dom-overlay'],
@@ -122,24 +138,42 @@ class WebXRChessApp {
             await this.renderer.xr.setSession(session);
             this.setupControllers(session);
             
-            document.getElementById('startButton').style.display = 'none';
+            startButton.style.display = 'none';
             document.getElementById('gameUI').style.display = 'block';
             
-            this.updateStatus('Suchen Sie eine ebene Fläche...');
+            this.updateStatus('Suchen Sie eine ebene Fläche oder tippen Sie zum direkten Platzieren...');
             
             session.addEventListener('end', () => {
                 console.log('AR-Session beendet');
                 this.hitTestSourceRequested = false;
                 this.hitTestSource = null;
-                document.getElementById('startButton').style.display = 'block';
+                this.resetStartButton();
+                startButton.style.display = 'block';
                 document.getElementById('gameUI').style.display = 'none';
                 this.updateStatus('AR-Session beendet');
             });
 
         } catch (error) {
             console.error('Detaillierter AR-Fehler:', error);
-            alert(`AR-Start fehlgeschlagen: ${error.message}\n\nTipps:\n- Stellen Sie sicher, dass Sie HTTPS verwenden\n- Prüfen Sie die Kamera-Berechtigungen\n- Verwenden Sie einen WebXR-kompatiblen Browser`);
+            this.resetStartButton();
+            
+            let errorMessage = 'AR-Start fehlgeschlagen';
+            if (error.message.includes('user activation')) {
+                errorMessage += ': Klicken Sie direkt auf den Button';
+            } else if (error.message.includes('NotAllowedError')) {
+                errorMessage += ': Kamera-Berechtigung wurde verweigert';
+            } else {
+                errorMessage += `: ${error.message}`;
+            }
+            
+            alert(`${errorMessage}\n\nTipps:\n- Verwenden Sie HTTPS\n- Erlauben Sie Kamera-Zugriff\n- Verwenden Sie Chrome oder Edge`);
         }
+    }
+
+    resetStartButton() {
+        const startButton = document.getElementById('startButton');
+        startButton.disabled = false;
+        startButton.textContent = 'AR starten';
     }
 
     setupControllers(session) {
