@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR AR Schach</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://raw.githack.com/supermedium/superframe/master/components/environment/dist/aframe-environment-component.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false" 
+        renderer="logarithmicDepthBuffer: true;"
+        background="color: transparent"
+        gesture-detector
+        id="scene">
+        
+        <!-- Assets -->
+        <a-assets>
+            <a-mixin id="chess-piece-mixin" 
+                     animation__mouseenter="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+                     animation__mouseleave="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200">
+            </a-mixin>
+        </a-assets>
+
+        <!-- Lights -->
+        <a-light type="ambient" color="#404040" intensity="0.8"></a-light>
+        <a-light type="directional" color="#FFF" intensity="0.6" position="-1 4 2"></a-light>
+
+        <!-- AR Camera -->
+        <a-camera
+            id="camera"
+            position="0 1.6 3"
+            look-controls="enabled: true"
+            wasd-controls="enabled: false"
+            cursor="rayOrigin: mouse"
+            raycaster="objects: .clickable; showLine: true; lineColor: red; lineOpacity: 0.5">
+            
+            <!-- Reticle for placing objects -->
+            <a-entity
+                id="reticle"
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: white; shader: flat; opacity: 0.8"
+                position="0 0 -1"
+                visible="false"
+                ar-hit-test>
+            </a-entity>
+        </a-camera>
+
+        <!-- Game Container -->
+        <a-entity id="game-container" visible="false">
+            <!-- Chessboard will be placed here -->
+        </a-entity>
+
+        <!-- UI Elements -->
+        <a-entity id="ui-container" position="0 2 -1.5">
+            <a-text 
+                id="game-status"
+                value="Tippe um das Schachbrett zu platzieren"
+                position="0 0.5 0"
+                align="center"
+                color="#FFF"
+                width="6">
+            </a-text>
+            
+            <a-text 
+                id="turn-indicator"
+                value=""
+                position="0 0.2 0"
+                align="center"
+                color="#00FF00"
+                width="4"
+                visible="false">
+            </a-text>
+            
+            <a-entity 
+                id="reset-button"
+                geometry="primitive: box; width: 0.3; height: 0.1; depth: 0.02"
+                material="color: #FF4444"
+                position="0 -0.2 0"
+                class="clickable"
+                visible="false">
+                <a-text 
+                    value="Neues Spiel"
+                    position="0 0 0.011"
+                    align="center"
+                    color="white"
+                    width="8">
+                </a-text>
+            </a-entity>
+        </a-entity>
+
+        <!-- Marker for AR positioning (fallback) -->
+        <a-marker type="pattern" url="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/data/patt.hiro">
+            <!-- Content will be added programmatically -->
+        </a-marker>
+    </a-scene>
+
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h2>WebXR AR Schach wird geladen...</h2>
+            <p>Bitte erlaube den Zugriff auf die Kamera</p>
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <div id="controls-info">
+        <h3>Steuerung:</h3>
+        <ul>
+            <li>Schaue umher um das Reticle zu sehen</li>
+            <li>Tippe um das Schachbrett zu platzieren</li>
+            <li>Klicke auf Figuren um sie zu bewegen</li>
+        </ul>
+    </div>
+
+    <script src="chess-game.js"></script>
+    <script src="ar-components.js"></script>
+</body>
+</html>
