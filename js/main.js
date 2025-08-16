@@ -8,6 +8,7 @@ class WebXRChessApp {
         this.reticle = null;
         this.hitTestSource = null;
         this.hitTestSourceRequested = false;
+        this.referenceSpace = null;
         this.chessBoard = null;
         this.chessPieces = null;
         this.chessEngine = null;
@@ -147,6 +148,7 @@ class WebXRChessApp {
                 console.log('AR-Session beendet');
                 this.hitTestSourceRequested = false;
                 this.hitTestSource = null;
+                this.referenceSpace = null;
                 this.resetStartButton();
                 startButton.style.display = 'block';
                 document.getElementById('gameUI').style.display = 'none';
@@ -191,18 +193,52 @@ class WebXRChessApp {
 
     async setupHitTesting(session) {
         try {
-            const referenceSpace = await session.requestReferenceSpace('viewer');
-            const hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
-            this.hitTestSource = hitTestSource;
-            this.hitTestSourceRequested = true;
-            console.log('Hit-Test erfolgreich eingerichtet');
+            // Versuche verschiedene Reference Space Types
+            let referenceSpace = null;
+            const spaceTypes = ['viewer', 'local', 'local-floor', 'bounded-floor'];
+            
+            for (const spaceType of spaceTypes) {
+                try {
+                    referenceSpace = await session.requestReferenceSpace(spaceType);
+                    console.log(`Reference Space '${spaceType}' erfolgreich erstellt`);
+                    break;
+                } catch (spaceError) {
+                    console.warn(`Reference Space '${spaceType}' nicht unterstützt:`, spaceError.message);
+                }
+            }
+            
+            if (!referenceSpace) {
+                throw new Error('Kein unterstützter Reference Space gefunden');
+            }
+            
+            // Speichere Reference Space für späteren Gebrauch
+            this.referenceSpace = referenceSpace;
+            
+            // Versuche Hit-Test einzurichten (optional)
+            try {
+                const hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
+                this.hitTestSource = hitTestSource;
+                this.hitTestSourceRequested = true;
+                console.log('Hit-Test erfolgreich eingerichtet');
+                this.updateStatus('Suchen Sie eine ebene Fläche zum Tippen...');
+            } catch (hitTestError) {
+                console.warn('Hit-Test nicht verfügbar:', hitTestError.message);
+                this.enableDirectPlacement();
+            }
+            
         } catch (error) {
-            console.warn('Hit-Test nicht verfügbar:', error);
-            this.updateStatus('Ebenenerkennung nicht verfügbar - Tippen Sie trotzdem zum Platzieren');
-            // Fallback: Erlaube direktes Platzieren ohne Hit-Test
-            this.reticle.visible = true;
-            this.reticle.position.set(0, 0, -2);
+            console.error('Reference Space Fehler:', error);
+            this.enableDirectPlacement();
         }
+    }
+    
+    enableDirectPlacement() {
+        console.log('Aktiviere direktes Platzieren ohne Hit-Test');
+        this.updateStatus('Tippen Sie zum direkten Platzieren des Schachbretts');
+        // Zeige Reticle an fester Position
+        this.reticle.visible = true;
+        this.reticle.position.set(0, -0.5, -2);
+        this.reticle.updateMatrix();
     }
 
     onSelect(event) {
@@ -390,20 +426,35 @@ class WebXRChessApp {
     }
 
     render() {
-        if (this.hitTestSource && !this.boardPlaced) {
+        if (this.hitTestSource && !this.boardPlaced && this.referenceSpace) {
             const session = this.renderer.xr.getSession();
             const frame = this.renderer.xr.getFrame();
             
-            if (frame) {
-                const referenceSpace = this.renderer.xr.getReferenceSpace();
-                const hitTestResults = frame.getHitTestResults(this.hitTestSource);
+            if (frame && session) {
+                try {
+                    const hitTestResults = frame.getHitTestResults(this.hitTestSource);
 
-                if (hitTestResults.length > 0) {
-                    const hit = hitTestResults[0];
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(this.referenceSpace);
+                        if (pose) {
+                            this.reticle.visible = true;
+                            this.reticle.matrix.fromArray(pose.transform.matrix);
+                        }
+                    } else {
+                        // Fallback: Zeige Reticle an fester Position wenn kein Hit
+                        if (!this.reticle.visible) {
+                            this.reticle.visible = true;
+                            this.reticle.position.set(0, -0.5, -2);
+                            this.reticle.updateMatrix();
+                        }
+                    }
+                } catch (renderError) {
+                    console.warn('Hit-Test Render Fehler:', renderError);
+                    // Bei Fehlern: Zeige Reticle an fester Position
                     this.reticle.visible = true;
-                    this.reticle.matrix.fromArray(hit.getPose(referenceSpace).transform.matrix);
-                } else {
-                    this.reticle.visible = false;
+                    this.reticle.position.set(0, -0.5, -2);
+                    this.reticle.updateMatrix();
                 }
             }
         }
