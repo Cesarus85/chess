@@ -17,33 +17,130 @@ AFRAME.registerComponent('ar-hit-test', {
         this.scene.addEventListener('enter-vr', this.onEnterVR.bind(this));
         this.scene.addEventListener('exit-vr', this.onExitVR.bind(this));
         
-        // Start AR session automatically
-        this.startARSession();
+        // Don't start AR session automatically - wait for user interaction
     },
 
     startARSession: function() {
-        if (navigator.xr) {
-            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                if (supported) {
-                    this.scene.enterVR();
-                } else {
-                    console.warn('AR not supported, using camera view');
+        // Check for camera permissions first
+        this.requestCameraPermission().then(() => {
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                    if (supported) {
+                        console.log('WebXR AR supported, attempting to start session');
+                        this.requestARSession();
+                    } else {
+                        console.warn('AR not supported, using camera fallback');
+                        this.setupCameraFallback();
+                    }
+                }).catch((err) => {
+                    console.warn('Error checking AR support:', err);
                     this.setupCameraFallback();
-                }
-            });
-        } else {
-            console.warn('WebXR not supported, using camera view');
+                });
+            } else {
+                console.warn('WebXR not supported, using camera fallback');
+                this.setupCameraFallback();
+            }
+        }).catch((err) => {
+            console.error('Camera permission denied:', err);
             this.setupCameraFallback();
+        });
+    },
+
+    requestCameraPermission: function() {
+        return new Promise((resolve, reject) => {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then((stream) => {
+                        // Stop the stream immediately, we just wanted permission
+                        stream.getTracks().forEach(track => track.stop());
+                        console.log('Camera permission granted');
+                        resolve();
+                    })
+                    .catch((err) => {
+                        console.error('Camera permission denied:', err);
+                        reject(err);
+                    });
+            } else {
+                // Fallback for older browsers
+                console.warn('getUserMedia not supported, proceeding without explicit permission');
+                resolve();
+            }
+        });
+    },
+
+    requestARSession: function() {
+        if (navigator.xr) {
+            navigator.xr.requestSession('immersive-ar', {
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay'],
+                domOverlay: { root: document.body }
+            }).then((session) => {
+                console.log('AR session started successfully');
+                this.scene.renderer.xr.setSession(session);
+            }).catch((err) => {
+                console.warn('Failed to start AR session:', err);
+                this.setupCameraFallback();
+            });
         }
     },
 
     setupCameraFallback: function() {
+        console.log('Setting up camera fallback mode');
+        
+        // Update status text
+        this.statusText.setAttribute('value', 'AR nicht verfügbar - Klicke um das Schachbrett zu platzieren');
+        
         // Show reticle in center for non-AR devices
         this.el.setAttribute('visible', true);
         this.el.setAttribute('position', '0 0 -2');
         
         // Make reticle clickable for placement
         this.el.classList.add('clickable');
+        
+        // Try to access camera for background view
+        this.setupCameraBackground();
+    },
+
+    setupCameraBackground: function() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                } 
+            })
+            .then((stream) => {
+                console.log('Camera stream obtained for background');
+                
+                // Create video element for camera feed
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.autoplay = true;
+                video.playsInline = true;
+                video.muted = true;
+                
+                // Style video as background
+                video.style.position = 'fixed';
+                video.style.top = '0';
+                video.style.left = '0';
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.zIndex = '-1';
+                
+                document.body.appendChild(video);
+                
+                // Update scene background
+                this.scene.setAttribute('background', 'color: transparent');
+                
+                this.statusText.setAttribute('value', 'Kamera aktiv - Klicke um das Schachbrett zu platzieren');
+            })
+            .catch((err) => {
+                console.warn('Could not access camera for background:', err);
+                this.statusText.setAttribute('value', 'Keine Kamera - Klicke um das Schachbrett zu platzieren');
+            });
+        }
     },
 
     onEnterVR: function() {
@@ -330,11 +427,54 @@ AFRAME.registerComponent('chess-piece', {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('AR Components initialized');
     
-    // Hide loading screen after a delay
-    setTimeout(() => {
+    // Add user interaction button for AR session
+    const startButton = document.createElement('button');
+    startButton.textContent = 'AR Schach starten';
+    startButton.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 15px 30px;
+        font-size: 18px;
+        background: linear-gradient(45deg, #00d4ff, #00ff88);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        z-index: 1001;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+    `;
+    
+    startButton.addEventListener('click', function() {
+        console.log('Start button clicked');
+        startButton.remove();
+        
+        // Hide loading screen
         const loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
             loadingScreen.style.display = 'none';
         }
-    }, 3000);
+        
+        // Initialize AR
+        const reticle = document.querySelector('#reticle');
+        if (reticle && reticle.components['ar-hit-test']) {
+            reticle.components['ar-hit-test'].startARSession();
+        }
+    });
+    
+    // Add button to loading screen
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.appendChild(startButton);
+    }
+    
+    // Show controls info
+    setTimeout(() => {
+        const controlsInfo = document.getElementById('controls-info');
+        if (controlsInfo) {
+            controlsInfo.style.opacity = '1';
+        }
+    }, 1000);
 });
