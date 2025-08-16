@@ -96,37 +96,49 @@ class WebXRChessApp {
 
     async startAR() {
         if (!navigator.xr) {
-            alert('WebXR wird nicht unterstützt');
+            alert('WebXR wird nicht unterstützt. Verwenden Sie einen WebXR-kompatiblen Browser.');
             return;
         }
 
         try {
+            // Zuerst prüfen ob AR unterstützt wird
             const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
             if (!isSupported) {
-                alert('AR wird nicht unterstützt');
+                alert('AR wird von diesem Gerät nicht unterstützt');
                 return;
             }
 
+            console.log('Starte AR-Session...');
+            
+            // Session mit reduzierten Anforderungen starten
             const session = await navigator.xr.requestSession('immersive-ar', {
-                requiredFeatures: ['hit-test']
+                requiredFeatures: [],
+                optionalFeatures: ['hit-test', 'dom-overlay'],
+                domOverlay: { root: document.body }
             });
 
-            this.renderer.xr.setSession(session);
+            console.log('AR-Session erfolgreich gestartet');
+
+            await this.renderer.xr.setSession(session);
             this.setupControllers(session);
             
             document.getElementById('startButton').style.display = 'none';
             document.getElementById('gameUI').style.display = 'block';
             
+            this.updateStatus('Suchen Sie eine ebene Fläche...');
+            
             session.addEventListener('end', () => {
+                console.log('AR-Session beendet');
                 this.hitTestSourceRequested = false;
                 this.hitTestSource = null;
                 document.getElementById('startButton').style.display = 'block';
                 document.getElementById('gameUI').style.display = 'none';
+                this.updateStatus('AR-Session beendet');
             });
 
         } catch (error) {
-            console.error('Fehler beim Starten der AR-Session:', error);
-            alert('Fehler beim Starten von AR: ' + error.message);
+            console.error('Detaillierter AR-Fehler:', error);
+            alert(`AR-Start fehlgeschlagen: ${error.message}\n\nTipps:\n- Stellen Sie sicher, dass Sie HTTPS verwenden\n- Prüfen Sie die Kamera-Berechtigungen\n- Verwenden Sie einen WebXR-kompatiblen Browser`);
         }
     }
 
@@ -139,18 +151,30 @@ class WebXRChessApp {
         this.controller2.addEventListener('select', (event) => this.onSelect(event));
         this.scene.add(this.controller2);
 
-        // Setup hit test
-        session.requestReferenceSpace('viewer').then((referenceSpace) => {
-            session.requestHitTestSource({ space: referenceSpace }).then((source) => {
-                this.hitTestSource = source;
-            });
-        });
+        // Setup hit test mit besserer Fehlerbehandlung
+        this.setupHitTesting(session);
+    }
 
-        this.hitTestSourceRequested = true;
+    async setupHitTesting(session) {
+        try {
+            const referenceSpace = await session.requestReferenceSpace('viewer');
+            const hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
+            this.hitTestSource = hitTestSource;
+            this.hitTestSourceRequested = true;
+            console.log('Hit-Test erfolgreich eingerichtet');
+        } catch (error) {
+            console.warn('Hit-Test nicht verfügbar:', error);
+            this.updateStatus('Ebenenerkennung nicht verfügbar - Tippen Sie trotzdem zum Platzieren');
+            // Fallback: Erlaube direktes Platzieren ohne Hit-Test
+            this.reticle.visible = true;
+            this.reticle.position.set(0, 0, -2);
+        }
     }
 
     onSelect(event) {
-        if (!this.boardPlaced && this.reticle.visible) {
+        console.log('Select event triggered', { boardPlaced: this.boardPlaced, gameState: this.gameState });
+        
+        if (!this.boardPlaced) {
             this.placeBoardAtReticle();
         } else if (this.boardPlaced && this.gameState === 'playing') {
             this.handlePieceSelection(event);
@@ -158,23 +182,40 @@ class WebXRChessApp {
     }
 
     placeBoardAtReticle() {
+        console.log('Platziere Schachbrett...');
+        
         const position = new THREE.Vector3();
         const rotation = new THREE.Quaternion();
-        this.reticle.matrix.decompose(position, rotation, new THREE.Vector3());
-
-        this.chessBoard = new ChessBoard(this.scene);
-        this.chessBoard.createBoard(position, rotation);
-
-        this.chessPieces = new ChessPieces(this.scene);
-        this.chessPieces.createPieces(position, rotation);
-
-        this.chessEngine = new ChessEngine();
-
-        this.reticle.visible = false;
-        this.boardPlaced = true;
-        this.gameState = 'playing';
         
-        this.updateStatus('Weiss ist am Zug - Wählen Sie eine Figur');
+        if (this.reticle.visible && this.reticle.matrix) {
+            this.reticle.matrix.decompose(position, rotation, new THREE.Vector3());
+        } else {
+            // Fallback Position vor dem Spieler
+            position.set(0, -0.5, -2);
+            rotation.set(0, 0, 0, 1);
+        }
+
+        console.log('Brett Position:', position);
+
+        try {
+            this.chessBoard = new ChessBoard(this.scene);
+            this.chessBoard.createBoard(position, rotation);
+
+            this.chessPieces = new ChessPieces(this.scene);
+            this.chessPieces.createPieces(position, rotation);
+
+            this.chessEngine = new ChessEngine();
+
+            this.reticle.visible = false;
+            this.boardPlaced = true;
+            this.gameState = 'playing';
+            
+            this.updateStatus('Weiss ist am Zug - Wählen Sie eine Figur');
+            console.log('Schachbrett erfolgreich platziert');
+        } catch (error) {
+            console.error('Fehler beim Platzieren des Bretts:', error);
+            this.updateStatus('Fehler beim Erstellen des Spielbretts');
+        }
     }
 
     handlePieceSelection(event) {

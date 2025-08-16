@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Test</title>
+</head>
+<body>
+    <h1>WebXR Kompatibilitätstest</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testWebXR() {
+            const results = document.getElementById('results');
+            
+            // Test 1: WebXR verfügbar?
+            if (!navigator.xr) {
+                results.innerHTML += '<p>❌ WebXR nicht verfügbar</p>';
+                return;
+            }
+            results.innerHTML += '<p>✅ WebXR verfügbar</p>';
+            
+            // Test 2: AR unterstützt?
+            try {
+                const arSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                results.innerHTML += `<p>${arSupported ? '✅' : '❌'} AR ${arSupported ? 'unterstützt' : 'nicht unterstützt'}</p>`;
+                
+                if (arSupported) {
+                    // Test 3: Session starten
+                    try {
+                        const session = await navigator.xr.requestSession('immersive-ar', {
+                            requiredFeatures: [],
+                            optionalFeatures: ['hit-test']
+                        });
+                        results.innerHTML += '<p>✅ AR-Session erfolgreich gestartet</p>';
+                        
+                        // Session wieder beenden
+                        await session.end();
+                        results.innerHTML += '<p>✅ AR-Session erfolgreich beendet</p>';
+                        
+                    } catch (sessionError) {
+                        results.innerHTML += `<p>❌ AR-Session Fehler: ${sessionError.message}</p>`;
+                    }
+                }
+                
+            } catch (error) {
+                results.innerHTML += `<p>❌ AR-Test Fehler: ${error.message}</p>`;
+            }
+        }
+        
+        testWebXR();
+    </script>
+</body>
+</html>

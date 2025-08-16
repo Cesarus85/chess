@@ -112,11 +112,7 @@ class ChessPieces {
         const sphereGeometry = new THREE.SphereGeometry(radius * 0.5, 8, 6);
         sphereGeometry.translate(0, height * 0.4, 0);
         
-        const mergedGeometry = new THREE.BufferGeometry();
-        mergedGeometry.copy(geometry);
-        mergedGeometry.merge(sphereGeometry);
-        
-        return mergedGeometry;
+        return geometry;
     }
 
     createRookGeometry(radius, height) {
@@ -127,21 +123,7 @@ class ChessPieces {
             8
         );
         
-        // Add battlements
-        for (let i = 0; i < 4; i++) {
-            const battlement = new THREE.BoxGeometry(
-                radius * 0.3, 
-                height * 0.2, 
-                radius * 0.2
-            );
-            const angle = (i / 4) * Math.PI * 2;
-            battlement.translate(
-                Math.cos(angle) * radius * 0.7,
-                height * 0.4,
-                Math.sin(angle) * radius * 0.7
-            );
-            geometry.merge(battlement);
-        }
+        // Simplified rook without battlements for compatibility
         
         return geometry;
     }
@@ -155,11 +137,7 @@ class ChessPieces {
             8
         );
         
-        const headGeometry = new THREE.SphereGeometry(radius * 0.6, 8, 6);
-        headGeometry.scale(1.2, 0.8, 1.5);
-        headGeometry.translate(0, height * 0.5, radius * 0.3);
-        
-        baseGeometry.merge(headGeometry);
+        // Simplified knight geometry for compatibility
         return baseGeometry;
     }
 
@@ -171,15 +149,7 @@ class ChessPieces {
             8
         );
         
-        // Add pointed top
-        const topGeometry = new THREE.ConeGeometry(
-            radius * 0.4, 
-            height * 0.4, 
-            8
-        );
-        topGeometry.translate(0, height * 0.6, 0);
-        
-        geometry.merge(topGeometry);
+        // Simplified bishop geometry for compatibility
         return geometry;
     }
 
@@ -191,21 +161,7 @@ class ChessPieces {
             8
         );
         
-        // Add crown spikes
-        for (let i = 0; i < 5; i++) {
-            const spike = new THREE.ConeGeometry(
-                radius * 0.1, 
-                height * 0.3, 
-                4
-            );
-            const angle = (i / 5) * Math.PI * 2;
-            spike.translate(
-                Math.cos(angle) * radius * 0.6,
-                height * 0.5,
-                Math.sin(angle) * radius * 0.6
-            );
-            geometry.merge(spike);
-        }
+        // Simplified queen geometry for compatibility
         
         return geometry;
     }
@@ -218,23 +174,7 @@ class ChessPieces {
             8
         );
         
-        // Add cross on top
-        const crossVertical = new THREE.BoxGeometry(
-            radius * 0.1, 
-            height * 0.3, 
-            radius * 0.1
-        );
-        crossVertical.translate(0, height * 0.55, 0);
-        
-        const crossHorizontal = new THREE.BoxGeometry(
-            radius * 0.3, 
-            radius * 0.1, 
-            radius * 0.1
-        );
-        crossHorizontal.translate(0, height * 0.5, 0);
-        
-        geometry.merge(crossVertical);
-        geometry.merge(crossHorizontal);
+        // Simplified king geometry for compatibility
         return geometry;
     }
 
