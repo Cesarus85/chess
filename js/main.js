@@ -71,16 +71,56 @@ class WebXRChessApp {
     }
 
     createReticle() {
-        const geometry = new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2);
-        const material = new THREE.MeshBasicMaterial({ 
-            color: 0xffffff,
+        // Erstelle ein animiertes Reticle für die Platzierung
+        const group = new THREE.Group();
+        
+        // Äußerer Ring
+        const outerGeometry = new THREE.RingGeometry(0.15, 0.2, 32);
+        outerGeometry.rotateX(-Math.PI / 2);
+        const outerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.6
         });
-        this.reticle = new THREE.Mesh(geometry, material);
-        this.reticle.matrixAutoUpdate = false;
+        const outerRing = new THREE.Mesh(outerGeometry, outerMaterial);
+        group.add(outerRing);
+        
+        // Innerer Punkt
+        const innerGeometry = new THREE.CircleGeometry(0.05, 16);
+        innerGeometry.rotateX(-Math.PI / 2);
+        const innerMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.9
+        });
+        const innerCircle = new THREE.Mesh(innerGeometry, innerMaterial);
+        innerCircle.position.y = 0.001;
+        group.add(innerCircle);
+        
+        // Vier Richtungslinien
+        for (let i = 0; i < 4; i++) {
+            const lineGeometry = new THREE.PlaneGeometry(0.15, 0.02);
+            lineGeometry.rotateX(-Math.PI / 2);
+            const lineMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.7
+            });
+            const line = new THREE.Mesh(lineGeometry, lineMaterial);
+            line.position.y = 0.001;
+            line.rotateY((i * Math.PI) / 2);
+            line.position.x = Math.cos((i * Math.PI) / 2) * 0.25;
+            line.position.z = Math.sin((i * Math.PI) / 2) * 0.25;
+            group.add(line);
+        }
+        
+        this.reticle = group;
         this.reticle.visible = false;
         this.scene.add(this.reticle);
+        
+        // Animation für pulsierendes Reticle
+        this.reticleScale = 1.0;
+        this.reticleScaleDirection = 1;
     }
 
     setupEventListeners() {
@@ -127,10 +167,10 @@ class WebXRChessApp {
 
             console.log('AR unterstützt, starte Session...');
             
-            // Session mit minimalen Anforderungen starten
+            // Session mit minimalen Anforderungen starten - kein Hit-Test erforderlich
             const session = await navigator.xr.requestSession('immersive-ar', {
                 requiredFeatures: [],
-                optionalFeatures: ['hit-test', 'dom-overlay'],
+                optionalFeatures: ['dom-overlay'],
                 domOverlay: { root: document.body }
             });
 
@@ -187,57 +227,27 @@ class WebXRChessApp {
         this.controller2.addEventListener('select', (event) => this.onSelect(event));
         this.scene.add(this.controller2);
 
-        // Setup hit test mit besserer Fehlerbehandlung
-        this.setupHitTesting(session);
+        // Einfaches Reticle-System ohne Hit-Testing
+        this.setupSimpleReticle();
     }
 
-    async setupHitTesting(session) {
-        try {
-            // Versuche verschiedene Reference Space Types
-            let referenceSpace = null;
-            const spaceTypes = ['viewer', 'local', 'local-floor', 'bounded-floor'];
-            
-            for (const spaceType of spaceTypes) {
-                try {
-                    referenceSpace = await session.requestReferenceSpace(spaceType);
-                    console.log(`Reference Space '${spaceType}' erfolgreich erstellt`);
-                    break;
-                } catch (spaceError) {
-                    console.warn(`Reference Space '${spaceType}' nicht unterstützt:`, spaceError.message);
-                }
-            }
-            
-            if (!referenceSpace) {
-                throw new Error('Kein unterstützter Reference Space gefunden');
-            }
-            
-            // Speichere Reference Space für späteren Gebrauch
-            this.referenceSpace = referenceSpace;
-            
-            // Versuche Hit-Test einzurichten (optional)
-            try {
-                const hitTestSource = await session.requestHitTestSource({ space: referenceSpace });
-                this.hitTestSource = hitTestSource;
-                this.hitTestSourceRequested = true;
-                console.log('Hit-Test erfolgreich eingerichtet');
-                this.updateStatus('Suchen Sie eine ebene Fläche zum Tippen...');
-            } catch (hitTestError) {
-                console.warn('Hit-Test nicht verfügbar:', hitTestError.message);
-                this.enableDirectPlacement();
-            }
-            
-        } catch (error) {
-            console.error('Reference Space Fehler:', error);
-            this.enableDirectPlacement();
-        }
+    setupSimpleReticle() {
+        console.log('Verwende einfaches Reticle-System ohne Hit-Testing');
+        
+        // Animiertes Reticle das sich vor dem Spieler bewegt
+        this.reticle.visible = true;
+        this.setupReticleAnimation();
+        
+        this.updateStatus('Schauen Sie sich um und tippen Sie zum Platzieren des Schachbretts');
     }
     
-    enableDirectPlacement() {
-        console.log('Aktiviere direktes Platzieren ohne Hit-Test');
-        this.updateStatus('Tippen Sie zum direkten Platzieren des Schachbretts');
-        // Zeige Reticle an fester Position
-        this.reticle.visible = true;
-        this.reticle.position.set(0, -0.5, -2);
+    setupReticleAnimation() {
+        // Das Reticle folgt der Kamera/Controller-Richtung
+        this.reticleDistance = 2.0;
+        this.reticleHeight = -0.5;
+        
+        // Startposition
+        this.reticle.position.set(0, this.reticleHeight, -this.reticleDistance);
         this.reticle.updateMatrix();
     }
 
@@ -426,40 +436,42 @@ class WebXRChessApp {
     }
 
     render() {
-        if (this.hitTestSource && !this.boardPlaced && this.referenceSpace) {
-            const session = this.renderer.xr.getSession();
-            const frame = this.renderer.xr.getFrame();
-            
-            if (frame && session) {
-                try {
-                    const hitTestResults = frame.getHitTestResults(this.hitTestSource);
-
-                    if (hitTestResults.length > 0) {
-                        const hit = hitTestResults[0];
-                        const pose = hit.getPose(this.referenceSpace);
-                        if (pose) {
-                            this.reticle.visible = true;
-                            this.reticle.matrix.fromArray(pose.transform.matrix);
-                        }
-                    } else {
-                        // Fallback: Zeige Reticle an fester Position wenn kein Hit
-                        if (!this.reticle.visible) {
-                            this.reticle.visible = true;
-                            this.reticle.position.set(0, -0.5, -2);
-                            this.reticle.updateMatrix();
-                        }
-                    }
-                } catch (renderError) {
-                    console.warn('Hit-Test Render Fehler:', renderError);
-                    // Bei Fehlern: Zeige Reticle an fester Position
-                    this.reticle.visible = true;
-                    this.reticle.position.set(0, -0.5, -2);
-                    this.reticle.updateMatrix();
-                }
-            }
+        // Einfaches Reticle-System: Bewege Reticle basierend auf Kamera/Controller
+        if (!this.boardPlaced && this.reticle.visible) {
+            this.updateReticlePosition();
         }
 
         this.renderer.render(this.scene, this.camera);
+    }
+    
+    updateReticlePosition() {
+        // Verwende die Kamera-Position und -Rotation für das Reticle
+        if (this.renderer.xr.getSession()) {
+            const camera = this.renderer.xr.getCamera();
+            
+            if (camera) {
+                // Berechne Position vor der Kamera
+                const forward = new THREE.Vector3(0, 0, -1);
+                const cameraQuaternion = camera.quaternion.clone();
+                forward.applyQuaternion(cameraQuaternion);
+                
+                // Setze Reticle-Position
+                const reticlePosition = camera.position.clone();
+                reticlePosition.add(forward.multiplyScalar(this.reticleDistance));
+                reticlePosition.y = camera.position.y + this.reticleHeight;
+                
+                this.reticle.position.copy(reticlePosition);
+                
+                // Animiere das Reticle (pulsierend)
+                this.reticleScale += this.reticleScaleDirection * 0.01;
+                if (this.reticleScale > 1.2) {
+                    this.reticleScaleDirection = -1;
+                } else if (this.reticleScale < 0.8) {
+                    this.reticleScaleDirection = 1;
+                }
+                this.reticle.scale.setScalar(this.reticleScale);
+            }
+        }
     }
 }
 
